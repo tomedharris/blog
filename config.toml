@@ -31,7 +31,7 @@ theme = "minimal"
 # The list of available icons can be found at http://fontawesome.io/icons/
 
 [[menu.icon]]
-    url = "mailto:me@example.com"
+    url = "mailto:me@tharris.io"
     name = "envelope-o"
     weight = 1
 
@@ -41,16 +41,16 @@ theme = "minimal"
     weight = 2
 
 [[menu.icon]]
-    url = "https://twitter.com/tomeh/"
+    url = "https://twitter.com/thetomeh/"
     name = "twitter"
     weight = 3
 
 [[menu.icon]]
-    url = "https://www.linkedin.com/in/username/"
+    url = "https://www.linkedin.com/in/tom-harris-66b42042/"
     name = "linkedin"
     weight = 4
 
 [[menu.icon]]
-    url = "https://www.stackoverflow.com/username/"
+    url = "https://www.stackoverflow.com/users/934814/tomeh/"
     name = "stack-overflow"
     weight = 5
