@@ -15,7 +15,8 @@ theme = "minimal"
     highlightStyle = "default"
     highlightLanguages = ["go", "php"]
     css = ['/css/custom.css']
-    googleanalytics = false
+    googleanalytics = true
+
 
 [[menu.main]]
     url = "/"
