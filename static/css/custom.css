@@ -1,0 +1,11 @@
+kbd.item-tag {
+    padding: 4px 6px;
+    font-size: 90%;
+    border-radius: 0;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+}
+
+.hljs {
+    background: #F5F5F5 !important;
+}
