@@ -241,6 +241,6 @@ There are more elegant solutions that you can learn about by looking at the docu
 
 ## Conclusion
 
-If you made it to the end of this post, you should now have a development environment consisting of an apache webserver with PHP, and MySQL. Using the techniques used here you could easily add a Redis cache container, or make use of a gulp container as part of your asset building process. The next level is where you can use Docker as your production environment, this really is Dockers raison d'être, being able to package up environments and ships them around like you do with source code.
+If you made it to the end of this post, you should now have a development environment consisting of an apache webserver with PHP, and MySQL. Using the techniques used here you could easily add a Redis cache container, or make use of a gulp container as part of your asset building process. The next level is where you can use Docker as your production environment, this really is Dockers raison d'être, being able to package up environments and ship them around like you do with source code.
 
 I hope my first blog post was informative, if there are any errors with my post, please let me know and I will correct them and give credit where I can.
