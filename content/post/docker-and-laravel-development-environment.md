@@ -7,8 +7,6 @@ draft: false
 
 ## Introduction
 
-Docker is an actual thing, there is no doubt about it. I think one of the hardest jobs of a developer these days is trying to sift the worthwhile technologies from the hype. Many years ago, I started using Vagrant and Virtual Box to build isolated development environments which imitated production servers. A sticking point with Vagrant is that each machine is a full OS; trying to run 2 or more VMs on a laptop can be painful so when working on multiple projects, you end up juggling different machines, provisioning and destroying, halting and starting.
-
 Docker is many things, but as a way to build development environments, it really shines. In this guide, I am going to go through building a development environment for a Laravel project, and some of my work flow. The architecture for the environment will be an apache server, with php 7.1, laravel 5.4, and mysql 5.7.
 
 ## Selecting a base image
