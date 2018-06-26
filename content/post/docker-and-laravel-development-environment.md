@@ -1,13 +1,14 @@
 ---
 title: "Docker and Laravel development environment 2018"
-date: 2018-06-18
+date: 2018-06-26
 tags: ["php", "docker", "laravel", "devops"]
 draft: false
 ---
 
 ## Introduction
 
-This article is an updated version of one [I wrote last year](/archive/docker-and-laravel-development-environment). I had only been using Docker, with Laravel, for a month or so when I wrote it and can now expand on what I knew then with a year's extra experience!
+This article is an updated version of one [I wrote last year](/archive/docker-and-laravel-development-environment). 
+It makes more of an emphasis on using docker-compose and so should be easier to get stated with. It also makes use of Nginx and PHP-FPM as opposed to Apache with mod_php. This will help in a future article when we explore setting up multiple project backend containers, all running through a common Nginx webserver container.
 
 ### Who is this article for?
 
@@ -25,7 +26,13 @@ You might also like to create an account on Docker Hub. This isn't required as y
 
 ### Why Docker?
 
+<a href="https://www.docker.com">
+<img src="/images/docker-and-laravel-development-environment/mono-horizontal.png" style="float: right;"/>
+</a>
+
 There are numerous advantages of using Docker over other solutions such as Vagrant, or LAMP/WAMP. I won't go into detail but here are a few benefits:
+
+<div style="clear: both;"></div>
 
 - Easily reproduce your application runtime between developers, teams, and even into staging and production. No more, "That's odd, it works on my machine!"
 - Lightweight and fast - no more `vagrant up` then go and make a cup of coffee. Also, containers don't use anywhere near as many system resources as a VM (disk, memory, CPU).
@@ -46,7 +53,7 @@ We also use port 80 for all examples. If you have apache or nginx running on you
 
 If you want to go back to a completely clean slate, the following commands will remove all containers, images, volumes, and networks that we create.
 
-```bash
+```console
 docker rm -f $(docker ps -aq)
 docker image prune
 docker volume prune
@@ -112,7 +119,7 @@ The following directory structure works well for me, but it is up to you how you
 
 Create a projects folder somewhere on your filesystem e.g. `$HOME/Projects/` and add three files at the root of that folder `docker-compose.yml`, `sites.conf` and `phpinfo.php`.
 
-```bash
+```console
 mkdir $HOME/Projects
 cd $HOME/Projects
 touch docker-compose.yml
@@ -224,7 +231,7 @@ services:
 
 In a terminal, run:
 
-```bash
+```console
 docker-compose up -d
 ```
 
@@ -242,7 +249,7 @@ Now visit http://docker-laravel.test (Ensure it is in your hosts file, and if yo
 
 Create a directory in your project directory which will hold all your project repositories, then create a new laravel application in this directory.
 
-```bash
+```console
 mkdir $HOME/Projects/repositories
 cd $HOME/Projects/repositories
 laravel new docker-laravel
@@ -358,7 +365,7 @@ body {
 
 Quickly run yarn and npm run dev to pull in the nodejs modules and compile the CSS (if you don't have node installed, just create a static file in the public folder and pull it into the html).
 
-```bash
+```console
 yarn
 npm run dev
 ```
@@ -445,7 +452,7 @@ The only thing left to do is to connect up the database services. Docker compose
 
 So in our Laravel .env file, all we need to do is set the following values:
 
-```bash
+```console
 DB_HOST=db # The name of the mysql service in docker-compose.yml
 
 # Unprotected DB for development only.
