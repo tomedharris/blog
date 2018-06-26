@@ -21,7 +21,7 @@ I would recommend a good knowledge of Docker before starting this. Docker is a p
 - How to [tag](https://docs.docker.com/engine/reference/commandline/tag/) images to differentiate versions
 - The [docker-compose](https://docs.docker.com/compose/) tool
 
-You might also like to create an account on Docker Hub as we use this as our container registry later in the post. This isn't required as you can just store the container images on your machine, and you can pull public images without an account.
+You might also like to create an account on Docker Hub. This isn't required as you can just store the container images on your machine, and you can pull public images without an account.
 
 ### Why Docker?
 
