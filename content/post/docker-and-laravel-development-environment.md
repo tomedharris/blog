@@ -1,244 +1,473 @@
 ---
-title: "Docker and Laravel for a hip development environment"
-date: 2017-08-06
-tags: ["php", "docker", "laravel"]
+title: "Docker and Laravel development environment 2018"
+date: 2018-06-18
+tags: ["php", "docker", "laravel", "devops"]
 draft: false
 ---
 
 ## Introduction
 
-Docker is many things, but as a way to build development environments, it really shines. In this guide, I am going to go through building a development environment for a Laravel project, and some of my work flow. The architecture for the environment will be an apache server, with php 7.1, laravel 5.4, and mysql 5.7.
+This article is an updated version of one [I wrote last year](/archive/docker-and-laravel-development-environment). I had only been using Docker, with Laravel, for a month or so when I wrote it and can now expand on what I knew then with a year's extra experience!
 
-## Selecting a base image
+### Who is this article for?
 
-First of all, we need to create an image for our apache server. If we look at the [official PHP repository on DockerHub](https://hub.docker.com/_/php/), we can see that they provide a preconfigured PHP and apache image. Pull this image with: `$ docker pull php:7.1-apache`. Now create a test file and run a new container from the image we just downloaded.
+Developers, technical managers, people interested in Docker and devops.
+
+I would recommend a good knowledge of Docker before starting this. Docker is a powerful tool, it also has a fairly steep learning curve. I will try to explain everything as I go, but you might do well to have an understanding of the following before starting:
+
+- How to [run containers](https://docs.docker.com/engine/reference/run/) (`docker run ...`)
+- What a container registry is (for example [Docker Hub](https://hub.docker.com))
+- What a [Dockerfile](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/) is and how to use a Dockerfile to build images
+- How to [tag](https://docs.docker.com/engine/reference/commandline/tag/) images to differentiate versions
+- The [docker-compose](https://docs.docker.com/compose/) tool
+
+You might also like to create an account on Docker Hub as we use this as our container registry later in the post. This isn't required as you can just store the container images on your machine, and you can pull public images without an account.
+
+### Why Docker?
+
+There are numerous advantages of using Docker over other solutions such as Vagrant, or LAMP/WAMP. I won't go into detail but here are a few benefits:
+
+- Easily reproduce your application runtime between developers, teams, and even into staging and production. No more, "That's odd, it works on my machine!"
+- Lightweight and fast - no more `vagrant up` then go and make a cup of coffee. Also, containers don't use anywhere near as many system resources as a VM (disk, memory, CPU).
+- If one project requires < PHP 5.6 and another requires > PHP 7.1, that is no problem.
+
+### Before we start
+
+For these examples, we will use the base URL 'http://docker-laravel.test'. You will need to ensure that this URL resolves to your local machine. You can either install a DNS service locally such as [dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html), or you can edit your hosts file and add the following on a new line.
 
 ```
-$ echo "<?php phpinfo();" > index.php
-
-$ docker run --rm -it -v $(pwd):/var/www/html -p 8080:80 php:7.1-apache
+# /etc/hosts
+127.0.0.1 docker-laravel.test
 ```
 
-Now go to http://localhost:8080 in your browser and you should see your PHP Info page. Simple eh?
+We also use port 80 for all examples. If you have apache or nginx running on your machine already you will get errors about not being able to bind port 80. In such cases swap references to port 80 to use port 8080 on the host machine, then navigate to 'http://docker-laravel.test:8080' where instructed to navigate to 'http://docker-laravel.test'.
 
-If you have never used Docker before, the above command might seem a bit, convoluted. They get worse, but once you get your head around Docker, it makes sense. At the end of this article I will introduce docker-compose which uses configuration files to build and run your containers. It simplifies things a lot but to be able to work with docker-compose, you need to understand docker.
+#### Cleaning up
 
-Let's break down the docker run command into parts to explain what we are doing:
+If you want to go back to a completely clean slate, the following commands will remove all containers, images, volumes, and networks that we create.
+
+```bash
+docker rm -f $(docker ps -aq)
+docker image prune
+docker volume prune
+docker network prune
+```
+
+--------------------
+
+## Choosing our environment
+
+### Architecture
+
+- Laravel 5.6 running on PHP 7.2
+- Nginx 1.15.0
+- Mysql 5.7
+- Redis 4
+
+### Selecting our images
+
+We can use the following images on Docker Hub to build our application:
+
+- [php:7.2-fpm](https://hub.docker.com/_/php/)
+- [nginx:1.15](https://hub.docker.com/_/nginx/)
+- [mysql:5.7](https://hub.docker.com/_/mysql/)
+- [redis:4](https://hub.docker.com/_/redis/)
+
+Lets first of all just pull all those images down now. This isn't strictly necessary as Docker will pull them for you when it requires them, but this will save time later.
+
+```
+docker pull php:7.2-fpm
+docker pull nginx:1.15
+docker pull mysql:5.7
+docker pull redis:4
+```
+
+Next, we will just run the nginx container with the `docker run ...` command just to make sure everything is working.
+
+```
+docker run --rm -it -p 8080:80 nginx:1.15
+```
+
+Now visit http://localhost:8080 in your browser and you should see the default nginx page, you will also see the nginx log in the terminal. You can do `ctrl-c` in the terminal window to halt the server.
+
+Let's break that command down:
 
 `docker run` - The Docker run command, simple enough.
 
-`--rm` - Once the container has finished running (the apache process stops), delete the container.
+`--rm` - Once the container has finished running (the nginx process stops), delete the container.
 
 `-it` - Attach an interactive tty to the running container. This allows us to send keystrokes to the container (e.g. ctrl-c to halt the server).
 
-`-v $(pwd):/var/www/html` - Mount the current working directory to the path /var/www/html on the container, this is where apaches document root is as setup in the php:7.1-apache Docker image.
+`-p 8080:80` - Forward port 8080 on our machine, to port 80 (nginx default port) on the container. We could also use `-p 80:80` to forward port 80 on our machine.
 
-`-p 8080:80` - Forward port 8080 on our machine, to port 80 (apaches default port) on the container. We could do use 80:80 but the chances are that port 80 on our machine is already in use.
+`nginx:1.15` - Use the nginx image with tag 1.15 which we pulled previously.
 
-`php:7.1-apache` - Use the image we pulled earlier, specifically, the *php* image using the tag *7.1-apache*.
+-----------------
 
-## Customising the image
+## Setting up our projects
 
-The current image is great as a base but it is not setup for our specific use case of running a Laravel project. For starters, the document root points to /var/www/html where as Laravel by default convention uses public as the folder for the publicly accessible root. We also need to enable some apache modules to get everything working. To do this we need to create a custom image which extends php:7.1-apache.
+### Project structure
 
-Create a folder for your Docker images somewhere on your computer, I use `/home/tom/Docker Images`. I would keep them separate from your project source code and probably source control them as a separate repository.
+The following directory structure works well for me, but it is up to you how you like to set this up.
 
-Inside this folder create a folder called `laravel`, and inside that create a file called `Dockerfile` and a file called `vhost.conf` like so:
+Create a projects folder somewhere on your filesystem e.g. `$HOME/Projects/` and add three files at the root of that folder `docker-compose.yml`, `sites.conf` and `phpinfo.php`.
 
-```txt
-Docker Images
-└── laravel
-    ├── Dockerfile
-    └── vhost.conf
+```bash
+mkdir $HOME/Projects
+cd $HOME/Projects
+touch docker-compose.yml
+touch sites.conf
+touch phpinfo.php
+
+# Add some php to the php info file
+echo "<?php phpinfo();" > phpinfo.php
 ```
 
-Open `vhost.conf` and paste in the following lines:
+The reason we have created a sample php file `phpinfo.conf` is that we haven't set up our Laravel project yet, that requires a few more steps and we want to make sure everything is working up to this point before we move on to that.
 
-```
-<VirtualHost *:80>
-    ServerAdmin webmaster@localhost
-    DocumentRoot /app/public
+### Nginx Config
 
-    ErrorLog ${APACHE_LOG_DIR}/error.log
-    CustomLog ${APACHE_LOG_DIR}/access.log combined
+We are going to mount our nginx config into the nginx container, some people might wish to extend the nginx container and create a new image with the config in it. That might be more suitable for production, but for development, this will suffice.
 
-    <Directory "/app">
-        Options Indexes FollowSymLinks
-        AllowOverride None
-        Require all granted
-    </Directory>
+Edit sites.conf:
 
-    <Directory "/app/public">
-        AllowOverride all
-    </Directory>
-</VirtualHost>
-```
+```conf
+# $HOME/Projects/sites.conf
 
-Notice we have specified '/app/public as the document root. This means that if we mount our project files at the path '/app', everything should be in the correct place.
+server {
+  listen 80 default_server;
 
-Open `Dockerfile` and paste the following lines:
+  root /srv/static/docker-laravel/public;
 
-```text
-# Extending the php apache image.
-FROM php:7.1-apache
+  add_header X-Frame-Options "SAMEORIGIN";
+  add_header X-XSS-Protection "1; mode=block";
+  add_header X-Content-Type-Options "nosniff";
 
-# Use our custom apache config.
-COPY vhost.conf /etc/apache2/sites-enabled/000-default.conf
+  index index.html index.htm index.php;
 
-# Run the a2enmod command to install mod_rewrite.
-RUN a2enmod rewrite
+  charset utf-8;
 
-# Install php extensions.
-RUN docker-php-ext-install mysqli
-RUN docker-php-ext-install pdo_mysql
+  location / {
+    try_files $uri $uri/ /index.php?$query_string;
+  }
 
-# Change the default directory.
-# It is specified as /var/www/html in the base image.
-WORKDIR /app
-```
+  location = /favicon.ico { access_log off; log_not_found off; }
+  location = /robots.txt  { access_log off; log_not_found off; }
 
-Now that we have specified our alterations to the image, we need to build it. Make sure you are in the directory with the Dockerfile and run:
+  error_page 404 /index.php;
 
-```
-$ docker built -t myname/laravel .
+  location ~ \.php$ {
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+
+    fastcgi_pass docker-laravel:9000;
+    fastcgi_index index.php;
+    include fastcgi_params;
+
+    fastcgi_param SCRIPT_FILENAME /app/public$fastcgi_script_name;
+  }
+}
 ```
 
-Give it a few seconds to run, then once it has built we can use this newly created image to host our Laravel app: change directory to your project root and run the following:
+### Docker compose
 
-```
-$ docker run --rm -it -v $(pwd):/app -p 8080:80 myname:laravel
-```
+Edit the docker-compose.yml and add the following contents
 
-Notice that we have switched 'php:7.1-apache' for our new image, 'myname:laravel' in that last run command. We have also changed the volume mount point from /var/www/html to /app as specified in the vhost.conf.
+```yml
+# $HOME/Projects/docker-compose.yml
 
-Visit http://localhost:8080 and you should see your Laravel site. Please note that we haven't setup a database yet so you may see PDO exceptions but we will fix that next. Use Ctrl-C to kill the server.
-
-----
-
-## Creating a database container
-
-Luckily, there are plenty of MySQL images on DockerHub which will do what we need without any modification. Run the following command:
-
-```
-$ docker run -d --name myapp-db \ 
-  -e MYSQL_ROOT_PASSWORD=password -e MYSQL_DATABASE=laravel \
-  mysql:5.7
-```
-
-The difference here is we ran docker run with `-d` instead of `--rm -it`. Essentially this means that we are running it as a background process, so instead of seeing the output of the MySQL process we are returned to our shell. If you run `$ docker ps` you will see our MySQL container with the name 'myapp-db'. We need to configure Laravel to communicate with MySQL but by default, Laravel is setup to use localhost.
-
-### Creating a user defined network for our application
-
-Lets use Dockers network features to create a user defined network:
-
-```
-$ docker network create --subnet=172.18.0.0/16 myapp
-```
-
-### Linking our containers together
-
-We now need to recreate the MySQL container and use our user defined network, we also assign a static IP, but first lets stop and destroy the current running MySQL container:
-
-```
-$ docker stop myapp-db && docker rm myapp-db # Or you can just use docker rm -f myapp-db
-$ docker run -d --name myapp-db -e MYSQL_ROOT_PASSWORD=password -e MYSQL_DATABASE=laravel --net myapp --ip 172.18.0.22 mysql:5.7
-```
-
-Now if you run `$ docker network inspect myapp` you will see 'myapp-db' under the containers section of the output. We now need to tell Laravel where to discover our database, go to your .env file and fill in the DB information.
-
-```
-DB_CONNECTION=mysql
-DB_HOST=172.18.0.22
-DB_PORT=3306
-DB_DATABASE=laravel
-DB_USERNAME=root
-DB_PASSWORD=password
-```
-
-We can now re run our Laravel container using the network we created to view our site and now the container will be able to communicate with MySQL. Note that we are adding the `--net myapp` option to the docker run command so that we can communicate with the MySQL container.
-
-```
-$ docker run --rm -it -v $(pwd):/app -p 8080:80 --net myapp myname/laravel
-```
-
-----
-
-## Running artisan commands
-
-When we run a docker run command, the image will most likely have a default command. This means that if you don't supply any arguments after the image name, the default will run. If the case of php:7.1-apache (and therefore our image myname/laravel) this is the apache server. If we supply an argument to the command this gets executed instead. This isn't strictly true in all cases as there is a difference between a command and an entry point but that is beyond the scope of this post; for the example here, it works. Try running: 
-
-```
-$ docker run --rm -it -v $(pwd):/app --net myapp myname/laravel php artisan migrate
-```
-
-Lets break this command down:
-
-`docker run --rm -it -v $(pwd):/app` - Hopefully we understand this at this point.
-
-`--net myapp` - add this container to the myapp network.
-
-`myname/laravel` - Use the image we built.
-
-`php artisan migrate` - Everything after the image name is sent to the container as the command. Since the working directory is /app we can use php artisan migrate to migrate the database.
-
-Please not that this wouldn't work without the `--net ...` option as artisan wouldn't be able to comminicate the the database to perform the migrations. Also, you might have noticed that we didn't forward port 8080:80 with this container, there was no need as we never intend web traffic to hit this container, we are purely using the php-cli provided by the image.
-
-If you wanted to make running artisan commands easier, you could easily create an alias. I usually do something like `$ alias artisan="docker run --rm -it -v $(pwd):/app --net myapp myname/laravel php artisan migrate"`. Now artisan commands can be run using `$ artisan migrate`.
-
-You can also do things like:
-
-```
-$ alias phpunit="docker run docker run --rm -it -v $(pwd):/app myname/laravel vendor/bin/phpunit"
-$ phpunit
-```
-
-----
-
-## Simplifying things with docker-compose
-
-Docker commands can seem a bit complex at first. Thankfully we can use docker-compose to setup and run the containers using a configuration file, but first lets start from scratch by removing the containers we have created. `$ docker rm -f $(docker ps -aq)`. This will remove every docker container.
-
-Create a file `docker-compose.yml`. If you don't want to add it to your repository, place it in the parent directory of your laravel install, and change the paths accordingly, or add it to your .gitignore file.
-
-Add the following to your `docker-composer.yml`
-
-```
-version: "2"
+version: "3"
 services:
-  web:
-    build: ../Docker Images/laravel
+  nginx:
+    image: nginx:1.15
+    restart: always
     volumes:
-      - .:/app
+      # This mounts the site config into the containers config dir for nginx.
+      - ./sites.conf:/etc/nginx/conf.d/sites.conf
     ports:
-      - "8080:80"
+      # Change to 8080:80 if running a web server on port 80 already.
+      - "80:80"
+
+  docker-laravel:
+    image: php:7.2-fpm
+    working_dir: /app
+    volumes:
+      # This mounts our phpinfo file into the container at the content route
+      # The directory '/app/public' comes from our sites.conf directive:
+      # 'fastcgi_param SCRIPT_FILENAME'
+      # If you want to change this folder, ensure you also edit sites.conf
+      - ./phpinfo.php:/app/public/index.php
     depends_on:
       - db
+      - redis
+
   db:
     image: mysql:5.7
+    restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=password
-      - MYSQL_DATABASE=laravel
-```
-
-Now run `$ docker-compose -p myapp -d up`. It will do everything for you including building the image, and running the containers. We can use `$ docker-compose -p myappp down` to drop the the applications.
-
-The problem here is that you will lose all data in your database everytime you run the docker-compose down command. This is because the container is destroyed so the volumes are garbage collected. If you want to persist your database between these runs you will need to make use of docker volumes. The simplest way is to mount a volume into the db: section of the docker-compose.yml file, by mounting a file from your host filesystem, you will always persist that data directory. For example, 
-
-```
-# ...
-  db:
-    # ...
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - MYSQL_DATABASE=docker_laravel_db
     volumes:
-      - /path/to/datadir:/var/lib/mysql
+      - ./data/db:/var/lib/mysql
+    ports:
 
+      # This is optional and allows us to use
+      # Database tools (e.g. HeidiSQL/Workbench) at 127.0.0.1:3306
+      # Change to something like 33066:3306 if already running mysql locally
+      - "3306:3306"
+
+  redis:
+    image: redis
+    restart: always
 ```
 
-There are more elegant solutions that you can learn about by looking at the documentation for [Docker volumes](https://docs.docker.com/engine/tutorials/dockervolumes/).
+### Running the services
 
-----
+In a terminal, run:
+
+```bash
+docker-compose up -d
+```
+
+Now visit http://docker-laravel.test (Ensure it is in your hosts file, and if you bound the port in docker-compose.yml to 8080 you will need http://docker-laravel.test:8080). You should see the phpinfo file that we created. If so then the nginx container `nginx` is successfully communicating with the PHP-FPM container `docker-laravel`.
+
+#### Debugging issues
+
+*If you see the nginx page, or 'File not found', then something has gone wrong with your nginx configuration. If you change the nginx config file sites.conf you will need to run `docker-compose restart nginx`. Any changes you make to docker-compose.yml must be proceeded with `docker-compose up -d` again to apply them to the running containers.*
+
+*You can open bash in the in the nginx container with `docker-compose exec nginx /bin/bash` for a poke around.*
+
+---------------------
+
+## Setting up our Laravel project
+
+Create a directory in your project directory which will hold all your project repositories, then create a new laravel application in this directory.
+
+```bash
+mkdir $HOME/Projects/repositories
+cd $HOME/Projects/repositories
+laravel new docker-laravel
+```
+
+*I would then typically version control $HOME/Projects/repositories/docker-laravel*
+
+### Creating a custom image
+
+The issue we currently have, is that the library php:7.2-fpm image is not suitable for running a Laravel project as it is. We need to extend this image to install the extra dependencies.
+
+This is the point where the value of Docker should really click. We are going to create an image which is perfectly suited to our codebase. In fact the image will include our source code, and if we choose, the image will become a container on a live server, serving web pages in production!
+
+Create a file in the laravel project : `Dockerfile`
+
+```conf
+# $HOME/Projects/repositories/docker-laravel/Dockerfile
+
+FROM php:7.2-fpm
+
+# Install some packages in to our container.
+RUN apt-get -yqq update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        apt-utils \
+        libzip-dev \
+        libpng-dev \
+        libfreetype6-dev \
+        libjpeg-dev \
+        libjpeg62-turbo-dev \
+        libmcrypt-dev \
+        libpng-dev \
+        autoconf \
+        g++ \
+        make \
+        openssl \
+        libssl-dev \
+        libcurl4-openssl-dev \
+        pkg-config \
+        libsasl2-dev \
+        libpcre3-dev \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+        ;
+
+# Install some php extensions.
+RUN pecl install mcrypt-1.0.1 \
+    && docker-php-ext-configure gd \
+      --with-freetype-dir=/usr/include/ \
+      --with-jpeg-dir=/usr/include/ \
+    && docker-php-ext-install \
+    mysqli \
+    pdo_mysql \
+    gd \
+    && docker-php-ext-enable mcrypt \
+    ;
+
+# Set the default directory of the container.
+WORKDIR /app
+
+# Copy all the files from the current directory into
+# the containers working directory (/app).
+COPY --chown=www-data:www-data . .
+```
+
+*We will see later how we can re-use a lot of this rather than putting all this (and maintaining it) in all of our code bases.*
+
+### Back to docker-compose.yml
+
+We now need to tell Docker compose to use our image instead of the base php:7.2-fpm version. Edit the docker-laravel service in docker-compose.yml
+
+```yml
+# $HOME/Projects/docker-compose.yml
+
+# ...
+
+  docker-laravel:
+    build: ./repositories/docker-laravel
+    depends_on:
+      - db
+      - redis
+
+# ...
+```
+
+Note that we use 'build' instead of 'image'. We can build the image manually and use 'image' like we did before. Infact we will do this shortly, but we are doing incremental improvements here. We also don't use the `working_dir` directive as we have specified that in the custom Dockerfile.
+
+### Re running the services
+
+Run the up command again. This will apply the new configuration.
+
+```
+docker-compose up -d
+```
+
+It will probably take a while the first time whilst it builds the image, installs packages and compiles in the new PHP extentions. Once it has finished, navigate to http://docker-laravel.test - you should see the laravel landing page.
+
+### Service static files
+
+Laravel's landing page (as of 5.6) has no static resources, so we need to add something to deal with the next issue. (If you are running an existing app you will already have noticed that the static CSS and images aren't loading so you can skip this step.)
+
+Append some style rule to `$HOME/Projects/repositories/docker-laravel/resources/assets/sass/app.scss`
+
+e.g.
+
+```css
+# $HOME/Projects/repositories/docker-laravel/resources/assets/sass/app.scss
+
+body {
+    background-color: blue !important;
+}
+```
+
+Quickly run yarn and npm run dev to pull in the nodejs modules and compile the CSS (if you don't have node installed, just create a static file in the public folder and pull it into the html).
+
+```bash
+yarn
+npm run dev
+```
+
+Pull the stylesheet into `$HOME/Projects/repositories/docker-laravel/resources/views/welcome.blade.php` somewhere in the `<head>`.
+
+```html
+<head>
+  <!-- ... -->
+
+  <link href="/css/app.css" rel="stylesheet" type="text/css">
+
+  <!-- ... -->
+</head>
+```
+
+We now need to rebuild the docker image to pull the latest changes into our image, (the css file and html changes). This is cumbersome and we will use a feature of docker to get around this in the next section.
+
+```
+docker-compose build docker-laravel
+docker-compose up -d
+```
+
+Reload the page, and it won't have the stylesheet applied. Open your browsers dev tools, go to network, and it will tell you that the file could not be found (404).
+
+What happened? Well, the problem is that nginx doesn't have access to our static files. We have put the files into the php-fpm container, but we need to also add them to the nginx container so that nginx can serve static files. We will mount the repositories directory into the nginx container at the directory /srv/static/. We earlier configured the nginx.conf to search for static files for this site in '/srv/static/docker-laravel/public';
+
+```yml
+# $HOME/Projects/docker-compose.yml
+
+# ...
+
+  nginx:
+    image: nginx:1.15
+    restart: always
+    volumes:
+      - ./sites.conf:/etc/nginx/conf.d/sites.conf
+      # Ensure nginx has the static files available.
+      - ./repositories:/srv/static/
+    ports:
+      # Change to 8080:80 if running a web server on port 80 already.
+      - "80:80"
+
+# ...
+```
+
+Run `docker-compose up -d` again and the static CSS files should now load.
+
+### Live editing files
+
+As touched on in the last section, this currently isn't great. We cannot rebuild the container every time we make a change. The solution involves editing the docker-compose.yml file again and using the volumes directive that we have already used a couple of times.
+
+```yml
+# $HOME/Projects/docker-compose.yml
+
+# ...
+
+  docker-laravel:
+    build: ./repositories/docker-laravel
+    # Add this mounted volume to basically sync our project files with
+    # the container, for development.
+    volumes:
+      - ./repositories/docker-laravel:/app
+    depends_on:
+      - db
+      - redis
+
+# ...
+```
+
+Run `docker-compose up -d` again to apply this config, and then edit your files live.
+
+If you get permission errors about writing to logs and cache, within a development environment, you can give the mounted files appropriate permissions for the user id for PHP-FPM process to write to.
+
+### A quick note on Dockerfile COPY vs mounting volumes
+
+You might ask, what is the point of COPY-ing the application files into the image within the Dockerfile if you are going to mount the project directory into the container? Well, if you only ever want a development environment, there is no problem with not copying any source code into the container. However, I wanted to demonstrate the real essence of Docker, whereby we have an image, with the source code, and everything needed to run the source code within a single image. You could easily take that image, and run it in a cloud, and with some environment variables set, it would work, guaranteed.
+
+### Connecting up the database and redis containers
+
+At this point, sI want to say that Docker networking is way beyond the scope of this post (it would double in length). I really recommend reading the [documentation](https://docs.docker.com/network/) at some point once comfortable with docker. It is worth pointing out though that if you want to connect other services to your current docker-compose project services, you will need to either expose a port to them, or use the docker-compose configuration docs to explicitly set up a network, that other external containers or processes can attach to.
+
+The only thing left to do is to connect up the database services. Docker compose creates a Docker virtual network for us that allows inter-service communication by using the service name. So in this example, nginx can communicate with the phpfpm container running Laravel by using the hostname 'docker-laravel'. This is a very powerful feature that allows really simple service discovery.
+
+So in our Laravel .env file, all we need to do is set the following values:
+
+```bash
+DB_HOST=db # The name of the mysql service in docker-compose.yml
+
+# Unprotected DB for development only.
+DB_USERNAME=root
+DB_PASSWORD=
+DB_DATABASE=docker_laravel_db
+
+REDIS_HOST=redis
+
+CACHE_DRIVER=redis
+SESSION_DRIVER=redis
+QUEUE_DRIVE=redis
+```
+
+Now to migrate the database we can run. If the database doesn't exist, you will need to connect to it using a mysql client and connect through the forwarded port we configured in docker-compose.yml. 
+
+```
+docker-compose exec docker-laravel php artisan migrate
+```
+
+Now we should have a fully working Laravel development environment, using Docker!
 
 ## Conclusion
 
-If you made it to the end of this post, you should now have a development environment consisting of an apache webserver with PHP, and MySQL. Using the techniques used here you could easily add a Redis cache container, or make use of a gulp container as part of your asset building process. The next level is where you can use Docker as your production environment, this really is Dockers raison d'être, being able to package up environments and ship them around like you do with source code.
-
-I hope my first blog post was informative, if there are any errors with my post, please let me know and I will correct them and give credit where I can.
+In this post, we went through building a development environment using Nginx and Php-fpm.

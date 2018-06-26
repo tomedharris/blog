@@ -1,3 +1,7 @@
+body {
+    font-size: 16px !important;
+}
+
 kbd.item-tag {
     padding: 4px 6px;
     font-size: 90%;
@@ -8,4 +12,14 @@ kbd.item-tag {
 
 .hljs {
     background: #F5F5F5 !important;
+}
+
+main {
+    max-width: 900px;
+}
+
+.aside {
+    padding: 10px;
+    padding-top: 1px;
+    background: #ce6261;
 }
