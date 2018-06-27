@@ -117,7 +117,7 @@ Let's break that command down:
 
 The following directory structure works well for me, but it is up to you how you like to set this up.
 
-Create a projects folder somewhere on your filesystem e.g. `$HOME/Projects/` and add three files at the root of that folder `docker-compose.yml`, `sites.conf` and `phpinfo.php`.
+Create a projects directory somewhere on your filesystem e.g. `$HOME/Projects/` and add three files at the root of that directory `docker-compose.yml`, `sites.conf` and `phpinfo.php`.
 
 ```console
 mkdir $HOME/Projects
@@ -198,10 +198,10 @@ services:
     image: php:7.2-fpm
     working_dir: /app
     volumes:
-      # This mounts our phpinfo file into the container at the content route
+      # This mounts our phpinfo file into the container at the content root
       # The directory '/app/public' comes from our sites.conf directive:
       # 'fastcgi_param SCRIPT_FILENAME'
-      # If you want to change this folder, ensure you also edit sites.conf
+      # If you want to change this directory, ensure you also edit sites.conf
       - ./phpinfo.php:/app/public/index.php
     depends_on:
       - db
@@ -363,7 +363,7 @@ body {
 }
 ```
 
-Quickly run yarn and npm run dev to pull in the nodejs modules and compile the CSS (if you don't have node installed, just create a static file in the public folder and pull it into the html).
+Quickly run yarn and npm run dev to pull in the nodejs modules and compile the CSS (if you don't have node installed, just create a static file in the public directory and pull it into the html).
 
 ```console
 yarn
@@ -446,7 +446,7 @@ You might ask, what is the point of COPY-ing the application files into the imag
 
 ### Connecting up the database and redis containers
 
-At this point, sI want to say that Docker networking is way beyond the scope of this post (it would double in length). I really recommend reading the [documentation](https://docs.docker.com/network/) at some point once comfortable with docker. It is worth pointing out though that if you want to connect other services to your current docker-compose project services, you will need to either expose a port to them, or use the docker-compose configuration docs to explicitly set up a network, that other external containers or processes can attach to.
+At this point, it is suitable to say that Docker networking is way beyond the scope of this post (it would double in length). I really recommend reading the [documentation](https://docs.docker.com/network/) at some point once comfortable with docker. It is worth pointing out though that if you want to connect other services to your current docker-compose project services, you will need to either expose a port to them, or use the docker-compose configuration docs to explicitly set up a network, that other external containers or processes can attach to.
 
 The only thing left to do is to connect up the database services. Docker compose creates a Docker virtual network for us that allows inter-service communication by using the service name. So in this example, nginx can communicate with the phpfpm container running Laravel by using the hostname 'docker-laravel'. This is a very powerful feature that allows really simple service discovery.
 
