@@ -1,11 +1,11 @@
-name: Kamboo CI/CD
+name: Tharrisio Blog CI/CD
 
 on:
   push:
     branches:
       - master
   schedule:
-    - cron: '15 20 * * 6' # At 20:15 on Saturdays
+    - cron: '20 20 * * 6' # At 20:20 on Saturdays
 
 jobs:
   build:
