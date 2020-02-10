@@ -4,4 +4,4 @@ COPY . /src
 
 RUN git submodule update --init --recursive
 
-CMD hugo -D
+CMD hugo --config config.live.toml
