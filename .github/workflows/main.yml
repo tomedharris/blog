@@ -17,7 +17,7 @@ jobs:
       - name: Build and publish
         uses: elgohr/Publish-Docker-Github-Action@master
         with:
-          name: tharrisio/kamboo-site
+          name: tharrisio/blog
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           registry: dkr.tharris.io
